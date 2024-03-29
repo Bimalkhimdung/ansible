@@ -19,5 +19,6 @@ demo.realhrsoft.com ansible_host=46.137.193.118  ansible_connection=ssh ansible_
 core.realhrsoft.com ansible_host=47.128.177.216  ansible_connection=ssh ansible_user=ubuntu
 [merojob]
 merojob.realhrsoft.com ansible_host=47.128.177.216  ansible_connection=ssh ansible_user=ubuntu
+
 [testcore]
 103.191.130.36:2222 ansible_connection=ssh ansible_user=test
