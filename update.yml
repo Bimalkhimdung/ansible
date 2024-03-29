@@ -1,0 +1,26 @@
+- name: On Server side
+  hosts: "{{ host }}"
+  gather_facts: no
+  become: true
+  become_user: root
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    client: "{{ client_name }}"
+    work_dir: "/etc/opt"
+    env_dir: "{{work_dir}}/{{ client }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client }}-realhrsoft-frontend"
+    pip_dir: "{{ env_dir }}/bin/pip"
+    python_dir: "{{ env_dir }}/bin/python"
+    git_dir: "/usr/bin/git"
+  #Service varibales 
+    nginx_app_name: "{{ client }}-realhrsoft"
+    service_backend: "{{ client }}-realhrsoft-backend"
+    service_qcluster: "{{ client }}-realhrsoft-qcluster"
+  tasks:
+    - name: Get Date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: Install zip 
+      command: "sudo apt update"     

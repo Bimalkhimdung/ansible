@@ -1,65 +1,65 @@
 #ansible-playbook ./new_version_update.yml -i ./inventory --extra-vars '{"be":"3.0.44.0+240322","fe":"3.0.44.0+240322","client_name":"testcore","host":"testcore"}'
 ---
-#- name: a play that runs entirely on the ansible host
-  # hosts: 127.0.0.1
-  # connection: local
-  # become: true
-  # gather_facts: no
-  # become_user: bimal
-  # vars:
-    # be_tag_name: "{{ be }}"
-    # fe_tag_name: "{{ fe }}"
-    # fe_dir: "~/aayulogic/irhrs-frontend/"
-    # be_dir: "~/aayulogic/irealhrsoft-backend/"
-    # git_dir: "/usr/bin/git"
-    # yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
-  # tasks:
-    # - name: Get Date
-      # command: date +"%Y-%m-%d"
-      # register: current_date
-    # - name: checkout backend Master Branch
-      # command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
-    # - name: git pull backend Master Branch
-      # command: "{{ git_dir }} pull chdir={{ be_dir }}"
-   # remove this after first done
-    # - name: git push master branch
-      # command: "{{ git_dir }} push {{item}} master chdir={{ be_dir }}"
-      # with_items: "{{ groups[host] }}"
-    # - name: checkout backend {{ be_tag_name }} tag
-      # command: "{{ git_dir }} checkout {{be_tag_name}} chdir={{ be_dir }}"
-    # - name: git pull backend {{ be_tag_name }} tag
-      # command: "{{ git_dir }} pull origin {{ be_tag_name }} chdir={{ be_dir }}"
-    # - name: git push
-      # command: "{{ git_dir }} push {{item}} {{be_tag_name}} chdir={{ be_dir }}"
-      # with_items: "{{ groups[host] }}"
-# 
-    # - name: checkout frontend master branch
-      # command: "{{ git_dir }} checkout master chdir={{ fe_dir }}"
-    # - name: git pull
-      # command: "{{ git_dir }} pull chdir={{ fe_dir }}"
-    # - name: checkout frontend {{fe_tag_name}} TAG
-      # command: "{{ git_dir }} checkout {{fe_tag_name}} chdir={{ fe_dir }}"
-    # - name: git pull {{ fe_tag_name }}
-      # command: "{{ git_dir }} pull origin {{ fe_tag_name }} chdir={{ fe_dir }}"
-    # - name: yarn FE
-      # command: "{{yarn_dir}} chdir={{ fe_dir }}"
-    # - name: Check file 
-      # stat:
-        # path: "{{ fe_dir }}/dist-{{ current_date.stdout }}.7z"
-      # register: file_check    
-    # - name: Delete old dist
-      # shell: "rm -rf dist* chdir={{ fe_dir }}"
-      # when: not file_check.stat.exists   #this task will be skipped if current date dist is exists 
-    # - name: yarn build
-      # command: "{{yarn_dir}} build -j3 chdir={{ fe_dir }}"
-      # when: not file_check.stat.exists
-    # - name: Install zip 
-      # command: "sudo apt install p7zip-full -y"
-    # - name:  zip FE
-      # shell: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }}"
-    # - name:  send zip file to client           
-      # shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date.stdout }}.7z {{item}}:/tmp  
-      # with_items: "{{ groups[host] }}"
+- name: a play that runs entirely on the ansible host
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+  gather_facts: no
+  become_user: bimal
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    fe_dir: "~/aayulogic/irhrs-frontend/"
+    be_dir: "~/aayulogic/irealhrsoft-backend/"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: Get Date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: checkout backend Master Branch
+      command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
+    - name: git pull backend Master Branch
+      command: "{{ git_dir }} pull chdir={{ be_dir }}"
+   remove this after first done
+    - name: git push master branch
+      command: "{{ git_dir }} push {{item}} master chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+    - name: checkout backend {{ be_tag_name }} tag
+      command: "{{ git_dir }} checkout {{be_tag_name}} chdir={{ be_dir }}"
+    - name: git pull backend {{ be_tag_name }} tag
+      command: "{{ git_dir }} pull origin {{ be_tag_name }} chdir={{ be_dir }}"
+    - name: git push
+      command: "{{ git_dir }} push {{item}} {{be_tag_name}} chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+
+    - name: checkout frontend master branch
+      command: "{{ git_dir }} checkout master chdir={{ fe_dir }}"
+    - name: git pull
+      command: "{{ git_dir }} pull chdir={{ fe_dir }}"
+    - name: checkout frontend {{fe_tag_name}} TAG
+      command: "{{ git_dir }} checkout {{fe_tag_name}} chdir={{ fe_dir }}"
+    - name: git pull {{ fe_tag_name }}
+      command: "{{ git_dir }} pull origin {{ fe_tag_name }} chdir={{ fe_dir }}"
+    - name: yarn FE
+      command: "{{yarn_dir}} chdir={{ fe_dir }}"
+    - name: Check file 
+      stat:
+        path: "{{ fe_dir }}/dist-{{ current_date.stdout }}.7z"
+      register: file_check    
+    - name: Delete old dist
+      shell: "rm -rf dist* chdir={{ fe_dir }}"
+      when: not file_check.stat.exists   #this task will be skipped if current date dist is exists 
+    - name: yarn build
+      command: "{{yarn_dir}} build -j3 chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
+    - name: Install zip 
+      command: "sudo apt install p7zip-full -y"
+    - name:  zip FE
+      shell: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }}"
+    - name:  send zip file to client           
+      shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date.stdout }}.7z {{item}}:/tmp  
+      with_items: "{{ groups[host] }}"
 
 - name: On Server side
   hosts: "{{ host }}"
