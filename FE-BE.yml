@@ -1,0 +1,131 @@
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# ansible-playbook ./playbook/backend-build-test.yml -i ./inventory --extra-vars '{"user_remote":" ","branch_name":"name","host":"<>"}'
+---
+#Authour: Bimal Rai (bimal.rai@aayoulogic.com)
+- name: On Local
+  hosts: 127.0.0.1
+  gather_facts: no
+
+  vars:
+    branch: "{{ branch_name }}"
+    work_dir: /home/bimal
+    be_dir: "{{ work_dir }}/aayulogic/irealhrsoft-backend"
+  tasks:
+    - name: Git Pull
+      command: "/usr/bin/git pull chdir={{ be_dir }}"
+    - name: Checkout {{branch}} brnach  
+      command: "/usr/bin/git  checkout {{ branch }} chdir={{ be_dir }}"
+    - name: Push to remote 
+      command: "/usr/bin/git push build {{ branch }} chdir={{ be_dir }}"
+
+- name: Building BE 
+  hosts: build
+  gather_facts: no
+  become: yes
+  become_user: build
+  vars:
+      branch: "{{ branch_name }}"   #Pass this as --extra-vars
+      work_dir: "/home/build"
+      app_dir: "{{ work_dir }}/app"
+      repo_dir: "{{ work_dir }}/repo.git"
+      python_dir: "{{ work_dir }}/realhrsoft/bin/python"
+      ssh_user: "{{ user_remote }}"
+  tasks:
+      - name: Get current date
+        command: date +"%d-%m-%Y"
+        register: current_date
+      - name: Deleting old app-compile
+        shell: rm -rf app-compile app_compile_* 
+        args:
+          chdir: "{{ app_dir }}"
+      - name: Checkout {{ branch }}
+        command: "/usr/bin/git  checkout {{ branch }} chdir={{ repo_dir }}"
+      - name: Building app-compile
+        command: "{{ python_dir }} setup.py build_ext --inplace chdir={{ app_dir}} "
+      - name: Making Zip file 
+        command: "/usr/bin/7z a app-compile-{{ current_date.stdout }}.7z app-compile  chdir={{ app_dir }}"
+      - name: Sending it to server...
+        shell: chdir={{app_dir}} /usr/bin/scp ./app-compile-{{ current_date.stdout }}.7z {{ssh_user}}@{{item}}:/home/{{ssh_user}}
+        with_items: "{{ groups[host]}}"
+- name: Building FE 
+  hosts: 127.0.0.1
+  gather_facts: no
+  become: yes
+  become_user: bimal
+  vars:
+    work_dir: "/home/bimal/aayulogic/irhrs-frontend"
+    git_dir: "/usr/bin/git"
+    branch: "{{ branch_name }}"
+    ssh_user: "{{ user_remote }}"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: Delete old dist
+      shell: chdir={{ work_dir }} rm -rf dist dist-*.7z
+    - name: Git Pull 
+      command: "{{git_dir }} pull chdir={{ work_dir }}"
+    - name: Git checkout  {{ branch }}
+      command: "{{ git_dir }} checkout {{ branch }}  chdir={{ work_dir }}"
+    - name: Git Pull {{ branch }}
+      command: "{{ git_dir }} pull origin {{ branch }} chdir={{ work_dir }}"
+    - name: Get current date
+      command: date +"%d-%m-%Y"
+      register: current_date
+    - name: Yarn Build
+      command: "{{ yarn_dir }} build chdir={{ work_dir }} "
+    - name: Making Zip file
+      command: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ work_dir }} "
+    - name: Sending it to server...
+      shell: chdir={{work_dir}} /usr/bin/scp ./dist-{{ current_date.stdout }}.7z {{ssh_user}}@{{item}}:/home/{{ssh_user}}
+      with_items: "{{groups[host]}}"
+- name: On Server
+  hosts: "{{ host }}"
+  gather_facts: no
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+  vars:
+    work_dir: "/home/{{ansible_user}}"
+    python_dir: "{{ work_dir}}/realhrsoft/bin/python"
+    circus_dir: "{{ work_dir }}/realhrsoft/bin/circusctl"
+    app_dir: "{{ work_dir }}/app-compile"
+
+
+  tasks:
+    - name: Get current date
+      command: date +"%d-%m-%Y"
+      register: current_date
+    - name: Circus stop
+      command: "{{ circus_dir }} stop"
+    - name: Backing Up old files
+      shell: |
+        cd {{ work_dir }}
+        mv app-compile  app-compile-bak-{{ current_date.stdout }}
+        mv dist dist-bak-{{ current_date.stdout }}
+    - name: Unzip file
+      ansible.builtin.shell: "/usr/bin/7z x app-compile-{{ current_date.stdout }}.7z  chdir={{ work_dir }}"
+    - name: Copying .env file
+      shell: "/usr/bin/cp -r app-compile-bak-{{ current_date.stdout }}/.env app-compile chdir={{ work_dir }}"
+    - name: Making Key-files
+      shell: |
+        mkdir key-files
+        {{ python_dir }} manage.py generate_rsa_keys --skip-checks
+      args:
+        chdir: "{{ app_dir }}"
+    - name: Changing Ownership
+      shell: chown -R {{ansible_user}}:{{ansible_user}} {{ app_dir }}/logs/*         #Passing Sudo will ask password so remove it -R will do recursively 
+      args:
+       chdir: "{{ work_dir }}"
+    - name: Make migration
+      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
+    - name: extracting dist
+      ansible.builtin.shell: "/usr/bin/7z x dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+      args:
+        executable: /bin/bash
+    - name: Copy runtimeConfig
+      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  dist  chdir={{ work_dir }}"
+    - name: Start circus
+      command: " {{ circus_dir }} reload "
+    - name: Restart nginx
+      command: "sudo systemctl restart nginx.service"
+    - name: Circusctl reloadconfig
+      command: "{{ circus_dir }} reloadconfig"

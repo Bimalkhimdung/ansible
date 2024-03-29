@@ -1,0 +1,63 @@
+
+#ansible-playbook ./frontend.yml -i inventory --extra-vars '{"user_remote":" ","branch_name":" ","host":""}'
+---
+- name: building frontend
+  hosts: 127.0.0.1
+  gather_facts: no
+  become: yes
+  become_user: bimal
+  vars:
+    work_dir: "/home/bimal/aayulogic/irhrs-frontend"
+    git_dir: "/usr/bin/git"
+    branch: "{{ branch_name }}"
+    ssh_user: "{{ user_remote }}"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: Delete old dist
+      shell: chdir={{ work_dir }} rm -rf dist dist-*.7z
+    - name: Git checkout  {{ branch }}
+      command: "{{ git_dir }} checkout {{ branch }}  chdir={{ work_dir }}"
+    - name: Git Pull {{ branch }}
+      command: "{{ git_dir }} pull origin {{ branch }} chdir={{ work_dir }}"
+    - name: Get current date
+      command: date +"%d-%m-%Y"
+      register: current_date
+    - name: Yarn Build
+      command: "{{ yarn_dir }} build chdir={{ work_dir }} "
+    - name: Making Zip file
+      command: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ work_dir }} "
+    - name: Sending it to server...
+      shell: chdir={{work_dir}} /usr/bin/scp ./dist-{{ current_date.stdout }}.7z {{ssh_user}}@{{item}}:/home/{{ssh_user}}
+      with_items: "{{groups[host]}}"
+
+- name: On Server
+  hosts: "{{ host }}"        
+  gather_facts: no 
+  become: yes 
+  become_user: "{{ ansible_user }}"
+  vars:
+    work_dir: "/home/{{ ansible_user }}"
+    circus_dir: "{{ work_dir }}/realhrsoft/bin/circusctl"
+    python_dir: "{{ working_dir }}/realhrsoft/bin/python"
+  tasks:
+    - name: current date
+      command: date +"%d-%m-%Y"
+      register: current_date
+    - name: Stopping Circus
+      command: "{{ circus_dir }} stop "
+    - name: Backup dist
+      command: "mv dist dist-bak-{{ current_date.stdout }}"
+      ignore_errors: yes 
+    - name: extracting dist
+      ansible.builtin.shell: "/usr/bin/7z x dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+      args:
+        executable: /bin/bash
+    - name: Copy runtimeConfig
+      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  dist  chdir={{ work_dir }}"
+    - name: Circus start
+      command: "{{ circus_dir }} reload "
+    - name: Restart nginx
+      command: "sudo systemctl restart nginx.service"
+    - name: Done
+      debug:
+          msg: " Successfully executed all tasks"

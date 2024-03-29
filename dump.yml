@@ -1,0 +1,70 @@
+
+
+# ansible-playbook ./dump.yml -i ./inventory --extra-vars '{"user_remote":"devops","db_name":"devopsdb","host":"khajuri"}'
+
+---
+#Authour: Bimal Rai (bimal.rai@aayoulogic.com)
+- name: In Local PC
+  hosts: 127.0.0.1
+  gather_facts: no
+  become: yes
+  become_user: bimal
+  vars:
+    work_dir: "/home/bimal"
+    ssh_user: "{{ user_remote }}"          
+  tasks:
+    - name: Getting date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: Sending it to server...
+      shell: "chdir={{work_dir}} /usr/bin/scp ./backup_*.7z {{ssh_user}}@{{item}}:/home/{{ssh_user}}"
+      with_items: "{{ groups[host]}}"
+
+        
+- name: In remote hosts
+  hosts: "{{ host }}"   
+  gather_facts: no
+  become: yes
+  become_user: "{{ ansible_user }}"
+  vars:
+    work_dir: "/home/{{ ansible_user }}"
+    app_dir: "{{ work_dir }}/app-compile"
+    db: "{{ db_name }}"                    # => Pass this db name as --extra-vars'{"db_name":"< name >""}
+    python_dir: "{{ work_dir }}/realhrsoft/bin/python3"
+    circus_dir: "{{work_dir}}/realhrsoft/bin/circusctl"
+  tasks:
+    - name: Getting date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: Database Password.
+      pause:
+         prompt: "Enter Database Password:"
+      register: password_input
+    - name: Unzipping...
+      command: "/usr/bin/7z x ./backup_{{ current_date.stdout }}*.7z -p{{ password_input.user_input }} chdir={{ work_dir }}"
+    - name: Circus Stop
+      command: "{{ circus_dir }} stop "
+    - name: Stopping postgres..
+      shell: sudo systemctl stop postgresql
+    - name: starting postgres..
+      shell: sudo systemctl start postgresql
+    - name: Dropping Database
+      command: "dropdb {{ db }}"
+    - name: Creating Database
+      command: "createdb {{ db }}"
+    - name: Restoring Database
+      shell: psql -U {{ ansible_ssh_user }} -d {{ db }} -f ~/backup_{{ current_date.stdout }}*
+      args:
+        chdir: "{{ work_dir }}"
+    - name: Changing Ownership
+      shell: chown -R {{ansible_user}}:{{ansible_user}} {{ app_dir }}/logs/*         #Passing Sudo will ask password so remove it -R will do recursively 
+      args:
+       chdir: "{{ work_dir }}"
+    - name: Making Migrations
+      command: "{{ python_dir }} manage.py migrate  chdir={{ app_dir }}"
+    - name: Circus Reload
+      command: "{{ circus_dir }} reload "
+    - name: Nginx restart
+      command: "sudo systemctl restart nginx.service"
+    - name: Circus Reload
+      command: "{{ circus_dir }} reload"

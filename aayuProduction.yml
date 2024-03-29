@@ -1,0 +1,109 @@
+#ansible-playbook ./aayuProduction.yml -i ./inventory --extra-vars '{"be":"3.0.34.0+231030","fe":"3.0.34.0+231030","user":"realhrsoft", "host":"stage-production"}'
+---
+- name: a play that runs entirely on the ansible host
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+  gather_facts: no
+  become_user: bimal
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    fe_dir: "~/aayulogic/irhrs-frontend/"
+    be_dir: "~/aayulogic/irealhrsoft-backend/"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: checkout backend Master Branch
+      command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
+    - name: git pull backend Master Branch
+      command: "{{ git_dir }} pull chdir={{ be_dir }}"
+    - name: checkout backend {{ be_tag_name }} tag
+      command: "{{ git_dir }} checkout {{be_tag_name}} chdir={{ be_dir }}"
+    - name: git push
+      command: "{{ git_dir }} push {{item}} {{be_tag_name}} chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+
+    - name: checkout frontend master branch
+      command: "{{ git_dir }} checkout master chdir={{ fe_dir }}"
+    - name: git pull stage branch
+      command: "{{ git_dir }} pull origin master chdir={{ fe_dir }}"
+    - name: checkout frontend {{fe_tag_name}} TAG
+      command: "{{ git_dir }} checkout {{fe_tag_name}} chdir={{ fe_dir }}"
+    - name: yarn FE
+      command: "{{yarn_dir}} chdir=~/aayulogic/irhrs-frontend/"
+    - name: yarn build
+      command: "{{yarn_dir}} build chdir={{ fe_dir }}"
+    - name:  zip FE
+      shell: chdir=~/aayulogic/irhrs-frontend/dist/ /usr/bin/zip -r $(TZ='Asia/Kathmandu' date +%Y-%m-%d).zip *
+    - name:  send zip file to client           
+      shell: chdir=~/aayulogic/irhrs-frontend/dist/ /usr/bin/scp $(TZ='Asia/Kathmandu' date +%Y-%m-%d).zip {{item}}:/home/{{user}}  
+      with_items: "{{ groups[host] }}"
+    
+- hosts: "{{ host }}"
+  gather_facts: no
+  become: true
+  become_user: "{{ ansible_user }}"
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    project_dir: "/home/{{ ansible_user }}/"
+    app_dir: "{{ project_dir }}app/"
+    python_dir: "{{ project_dir }}realhrsoft/bin/python3"
+    circus_dir: "{{ project_dir }}realhrsoft/bin/circusctl"
+    git_dir: "/usr/bin/git"
+  tasks:
+    - name: Get Date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: Taking Backup
+      command: "{{python_dir}} db_backup.py chdir={{app_dir}}"
+
+    - name: Stop nginx
+      command: sudo systemctl stop nginx
+
+    - name: stop circus
+      command: "{{ circus_dir }} stop"
+
+    - name: change tag {{be_tag_name}}
+      command: "{{git_dir}} checkout {{be_tag_name}} chdir={{ project_dir }}repo.git"
+
+    - name: start circus
+      command: "{{ circus_dir }} start"
+
+    - name: circusctl reload
+      command: "{{ circus_dir }} reload"
+      ignore_errors: yes
+    - name: Install requirements
+      shell: "/home/{{ansible_user}}/realhrsoft/bin/pip install -r requirements/production.txt chdir={{ app_dir }}"    
+
+    - name: Migration
+      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
+
+    - name: circusctl reload
+      command: "{{ circus_dir }} reload"
+      ignore_errors: yes  
+    - name: setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{ app_dir }}"
+
+    - name: Start nginx
+      command: sudo systemctl start nginx
+    
+    - name: Backup Frontend
+      command: "mv frontend frontend-bak-{{current_date.stdout}} chdir=/home/{{ansible_user}}"
+      ignore_errors: yes
+
+    - name: unzip frontend
+      shell: unzip -o $(TZ='Asia/Kathmandu' date +%Y-%m-%d).zip -d frontend/
+    - name: Copy runtimeconfig file
+      command: "cp frontend-bak-{{current_date.stdout}}/runtimeConfig.json frontend chdir=/home/{{ansible_user}}"
+      ignore_errors: yes
+
+    - name: circusctl reloadconfig
+      command: "{{ circus_dir }} reloadconfig"
+      ignore_errors: yes
+    - name: circusctl reload
+      command: "{{ circus_dir }} reload"
+      ignore_errors: yes
+    - name: delete old backups
+      command: 'find /home/{{ansible_user}}/backups/ -name "*.psql" -type f -mtime +45 -delete'

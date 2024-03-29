@@ -1,0 +1,175 @@
+#ansible-playbook ./version_update.yml -i ./inventory --extra-vars '{"be":"3.0.44.0+240322","fe":"3.0.44.0+240322","client_name":"testcore","host":"testcore"}'
+---
+- name: Changing file permissions before pushing into remote 
+  hosts: "{{ host }}"
+  become: yes
+  become_user: "{{ ansible_user }}" 
+  gather_facts: no 
+  vars:
+    client: "{{ client_name }}"
+    work_dir: "/etc/opt"
+    env_dir: "{{work_dir}}/{{ client }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client }}-realhrsoft-frontend"
+
+  tasks: 
+     - name: Changing file permissions to {{ ansible_user }} 
+       shell: "sudo chown -R {{ ansible_user }}:{{ ansible_user }}  {{ be_dir }}/*"
+     - name: Changing file permissions 
+       shell: "sudo chown -R {{ ansible_user }}:{{ ansible_user }}  {{ be_dir }}/.*"
+     - name: changing permissions to bare repo 
+       shell: "sudo chown -R {{ ansible_user }}:{{ ansible_user  }} {{ client }}-repo.git/*  chdir=/home/{{ ansible_user }}"
+    
+- name: a play that runs entirely on the ansible host
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+  gather_facts: no
+  become_user: bimal
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    fe_dir: "~/aayulogic/irhrs-frontend/"
+    be_dir: "~/aayulogic/irealhrsoft-backend/"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: Get Date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: checkout backend Master Branch
+      command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
+    - name: git pull backend Master Branch
+      command: "{{ git_dir }} pull chdir={{ be_dir }}"
+    # remove this after first done
+    # - name: git push master branch
+      # command: "{{ git_dir }} push {{item}} master chdir={{ be_dir }}"
+      # with_items: "{{ groups[host] }}"
+    - name: checkout backend {{ be_tag_name }} tag
+      command: "{{ git_dir }} checkout {{be_tag_name}} chdir={{ be_dir }}"
+    - name: git pull backend {{ be_tag_name }} tag
+      command: "{{ git_dir }} pull origin {{ be_tag_name }} chdir={{ be_dir }}"
+    - name: git push
+      command: "{{ git_dir }} push {{item}} {{be_tag_name}} chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+
+    - name: checkout frontend master branch
+      command: "{{ git_dir }} checkout master chdir={{ fe_dir }}"
+    - name: git pull
+      command: "{{ git_dir }} pull chdir={{ fe_dir }}"
+    - name: checkout frontend {{fe_tag_name}} TAG
+      command: "{{ git_dir }} checkout {{fe_tag_name}} chdir={{ fe_dir }}"
+    - name: git pull {{ fe_tag_name }}
+      command: "{{ git_dir }} pull origin {{ fe_tag_name }} chdir={{ fe_dir }}"
+    - name: yarn FE
+      command: "{{yarn_dir}} chdir={{ fe_dir }}"
+    - name: Check file 
+      stat:
+        path: "{{ fe_dir }}/dist-{{ current_date.stdout }}.7z"
+      register: file_check    
+    - name: Delete old dist
+      shell: "rm -rf dist* chdir={{ fe_dir }}"
+      when: not file_check.stat.exists   #this task will be skipped if current date dist is exists 
+    - name: yarn build
+      command: "{{yarn_dir}} build -j3 chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
+    - name: Install zip 
+      command: "sudo apt install p7zip-full -y"
+    - name:  zip FE
+      shell: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }}"
+    - name:  send zip file to client           
+      shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date.stdout }}.7z {{item}}:/tmp  
+      with_items: "{{ groups[host] }}"
+
+- name: On Server side
+  hosts: "{{ host }}"
+  gather_facts: no
+  become: true
+  become_user: root
+  vars:
+    be_tag_name: "{{ be }}"
+    fe_tag_name: "{{ fe }}"
+    client: "{{ client_name }}"
+    work_dir: "/etc/opt"
+    env_dir: "{{work_dir}}/{{ client }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client }}-realhrsoft-frontend"
+    pip_dir: "{{ env_dir }}/bin/pip"
+    python_dir: "{{ env_dir }}/bin/python"
+    git_dir: "/usr/bin/git"
+  #Service varibales 
+    nginx_app_name: "{{ client }}-realhrsoft"
+    service_backend: "{{ client }}-realhrsoft-backend"
+    service_qcluster: "{{ client }}-realhrsoft-qcluster"
+  tasks:
+    - name: Get Date
+      command: date +"%Y-%m-%d"
+      register: current_date
+    - name: Install zip 
+      command: "sudo apt install p7zip-full -y"     
+    - name: services {{ service_backend }} stop 
+      command: "sudo systemctl stop {{service_backend }}"
+    - name: services {{ service_qcluster }} stop 
+      command: "sudo systemctl stop {{ service_qcluster}}"
+    - name: Backup DATABASE
+      command: "{{python_dir}} db_backup.py chdir={{ be_dir }}"
+      ignore_errors: yes
+    
+    - name: change backend tag {{be_tag_name}}
+      command: "{{git_dir}} checkout {{be_tag_name}} chdir=/home/{{ ansible_user }}/{{ client }}-repo.git"
+#delete this after requirements get updated 
+    - name: Update cryptograpyhy version 
+      ansible.builtin.replace:
+        path: "{{ be_dir }}/requirements/base.txt"
+        regexp: 'cryptography==.*'
+        replace: 'cryptography==3.1.1'
+    - name: Update cryptograpyhy version 
+      ansible.builtin.replace:
+        path: "{{ be_dir }}/requirements/base.txt"
+        regexp: 'psycopg2-binary==.*'
+        replace: 'psycopg2-binary==2.9.9'
+    
+    - name: Install Requirements
+      command: "{{ pip_dir }} install -r requirements/production.txt chdir={{  be_dir  }}"
+    - name: Python Migration
+      command: "{{ python_dir }} manage.py migrate chdir={{  be_dir  }}"
+    - name: setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{  be_dir  }}"
+    - name: Backup Frontend
+      command: "sudo mv {{ client }}-realhrsoft-frontend {{ client }}-realhrsoft-frontend-bak-{{current_date.stdout}} chdir={{ work_dir }}"
+    - name: Move frontend
+      command: "sudo mv /tmp/dist-{{ current_date.stdout }}.7z {{ work_dir }} chdir={{ work_dir }}"
+    - name: unzip frontend
+      shell: "/usr/bin/7z x dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+    - name: Rename dist 
+      command: "mv dist {{ client }}-realhrsoft-frontend chdir={{ work_dir }}"
+    - name: Copy runtimeconfig file
+      command: "sudo cp {{ client }}-realhrsoft-frontend-bak-{{current_date.stdout}}/runtimeConfig.json {{ fe_dir }} chdir={{ work_dir }}"
+    - name: remove dist file 
+      command: "sudo rm -rf dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+    - name: Git stash changes 
+      command: "{{git_dir}} stash chdir=/home/{{ ansible_user }}/{{ client }}-repo.git"
+      ignore_errors: yes
+    - name: Restart nginx
+      command: "sudo systemctl restart nginx"
+    - name: services {{ service_backend }} start 
+      command: "sudo systemctl restart {{ service_backend }}"
+    - name: services {{ service_qcluster }} start  
+      command: "sudo systemctl restart {{service_qcluster}}" 
+
+- name: Changing file permissions after pushing into remote 
+  hosts: "{{ host }}"
+  become: yes
+  become_user: root 
+  gather_facts: no 
+  vars:
+    client: "{{ client_name }}"
+    work_dir: "/etc/opt"
+    env_dir: "{{work_dir}}/{{ client }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client }}-realhrsoft-frontend"
+  tasks: 
+     - name: Changing file permissions to root 
+       shell: "sudo chown -R root:root  {{ be_dir }}/*"
+     - name: Changing file permissions root
+       shell: "sudo chown -R root:root  {{ be_dir }}/.*"
