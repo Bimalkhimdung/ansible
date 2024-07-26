@@ -1,0 +1,107 @@
+#ansible-playbook ./frontend.yml -i inventory --extra-vars '{"clinet_name":" ","branch_name":" ","host":""}'
+---
+- name: building frontend
+  hosts: build
+  gather_facts: no
+  become: yes
+  become_user: build
+  vars:
+    work_dir: "/home/build/aayulogic/"
+    fe_dir: "{{ work_dir }}/irhrs-frontend"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/build/.nvm/versions/node/v16.18.0/bin/yarn"
+  tasks:
+    - name: Get current date
+      command: date +"%d%m%Y"
+      register: current_date  
+    - name: Delete old dist
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_item:
+        - "{{ fe_dir }}/dist"
+    - find:
+        paths: "{{ fe_dir }}"
+        patterns: "*.7z"
+      register: found_dist_file
+    - file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items:
+        - "{{ found_dist_file.file }}"        
+    - name: Git chekout master
+      command: "{{ git_dir }} checkout master chdir={{ fe_dir}}"
+    - name: Git Pull.
+      command: "{{ git_dir }} pull origin master chdir={{ fe_dir }}"
+    - name: Git checkout  {{ branch_name }} Branch.
+      command: "{{ git_dir }} checkout {{ branch_name }}  chdir={{ fe_dir }}"
+    - name: Git Pull {{ branch_name }}
+      command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ fe_dir }}"
+    - name: Set clinet_name for Build Dist file
+        ansible.builtin.lineinfile:
+          path: "{{ fe_dir }}/.env"
+          regexp: '^VUE_APP_CLIENT='
+          line: "VUE_APP_CLIENT='{{ client_name }}'"
+          create: yes
+    - name: Yarn Build
+      command: "{{ yarn_dir }} build -j11 chdir={{ fe_dir }} " #-j 11 will use 11 core of cpu
+    - name: Making Zip file
+      command: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }} "
+    - name: Fetching  dist to local 
+      ansible.builtin.synchronize:
+          src: "{{ fe_dir }}/dist-{{ current_date.stdout }}.7z"
+          dest: "/home/bimal/"
+          mode: pull
+- name: Push file 
+  hosts: "{{ host }}"
+  gather_facts: no
+
+  tasks:
+    - command: date +"%d%m%Y"
+      register: current_date
+    - name: Send file 
+      ansible.builtin.synchronize:
+          src: "{{ item }}"
+          dest: "/home/{{ ansible_user }}"
+          mode: push 
+      with_items:
+          - "/home/bimal/dist-{{ current_date.stdout }}.7z"
+      delegate_to: localhost 
+
+- name: On Server
+  hosts: "{{ host }}"        
+  gather_facts: no 
+  become: yes 
+  become_user: "{{ ansible_user }}"
+  vars:
+    work_dir: "/home/{{ ansible_user }}"
+  tasks:
+    - name: current date
+      command: date +"%d%m%Y"
+      register: current_date
+    - name: Check current dist file 
+      stat:
+        path: "{{ work_dir }}/dist-bak-{{ current_date.stdout}}"
+      register: check_dist
+    - name: Backup dist
+      command: "mv dist dist-bak-{{ current_date.stdout }} chdir={{ work_dir }}"
+      when: not check_dist.stat.exists
+    - name: extracting dist
+      ansible.builtin.shell: "/usr/bin/7z x dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+      args:
+        executable: /bin/bash
+    - name: Copy runtimeConfig
+      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  dist/  chdir={{ work_dir }}"
+    - name: Service  Start
+      block:
+      - service: 
+          name: "laxmi-backend"
+          state: restarted
+      - service:  
+         name: "laxmi-qcluster"
+         state: restarted
+      - service: 
+          name: "nginx"
+          state: reloaded
+      become: yes
+      become_user: root

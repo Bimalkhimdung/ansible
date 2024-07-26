@@ -1,4 +1,4 @@
-#ansible-playbook ./version_update.yml -i ./inventory --extra-vars '{"be":"3.0.44.0+240322","fe":"3.0.44.0+240322","client_name":"testcore","host":"testcore"}'
+#ansible-playbook ./version_update_arm_aws.yml -i ./inventory --extra-vars '{"be":"3.0.45.0+240405","fe":"3.0.45.0+240405","client_name":"testcore","host":"testcore"}'
 ---
 - name: Changing file permissions before pushing into remote 
   hosts: "{{ host }}"
@@ -77,6 +77,8 @@
       command: "sudo apt install p7zip-full -y"
     - name:  zip FE
       shell: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
+
     - name:  send zip file to client           
       shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date.stdout }}.7z {{item}}:/tmp  
       with_items: "{{ groups[host] }}"

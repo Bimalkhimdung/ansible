@@ -1,24 +1,6 @@
+[build]
+192.168.1.53  ansible_connection=ssh ansible_user=build
 
-[awecode]
-awecode.realhrsoft.com ansible_host=52.220.37.15 ansible_connection=ssh ansible_user=ubuntu
-[ewc]
-ewc.realhrsoft.com ansible_host=52.220.37.15 ansible_connection=ssh ansible_user=ubuntu
-[shtc]
-shtc.realhrsoft.com ansible_host=52.74.221.40 ansible_connection=ssh ansible_user=ubuntu
-[r2m]
-r2m.realhrsoft.com ansible_host=52.74.221.40 ansible_connection=ssh ansible_user=ubuntu
-[spark]
-sparkgroup.realhrsoft.com ansible_host=52.74.221.40 ansible_connection=ssh ansible_user=ubuntu
-[hei]
-hei.realhrsoft.com ansible_host=54.179.27.164 ansible_connection=ssh ansible_user=ubuntu
-[musicnepal]
-musicnepal.realhrsoft.com ansible_host=47.128.177.216  ansible_connection=ssh ansible_user=ubuntu
-[demo]
-demo.realhrsoft.com ansible_host=46.137.193.118  ansible_connection=ssh ansible_user=ubuntu
-[core]
-core.realhrsoft.com ansible_host=47.128.177.216  ansible_connection=ssh ansible_user=ubuntu
-[merojob]
-merojob.realhrsoft.com ansible_host=47.128.177.216  ansible_connection=ssh ansible_user=ubuntu
+[laxmi-test]
+192.168.1.31  ansible_connection=ssh ansible_user=ubuntu
 
-[testcore]
-103.191.130.36:2222 ansible_connection=ssh ansible_user=test

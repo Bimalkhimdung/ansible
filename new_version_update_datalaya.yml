@@ -1,4 +1,4 @@
-#ansible-playbook ./new_version_update.yml -i ./inventory --extra-vars '{"be":"3.0.44.0+240322","fe":"3.0.44.0+240322","client_name":"testcore","host":"testcore"}'
+#ansible-playbook ./new_version_update_datalaya.yml -i ./inventory --extra-vars '{"be":"3.0.45.0+240405","fe":"3.0.45.0+240405","client_name":"testcore","host":"testcore"}'
 ---
 - name: a play that runs entirely on the ansible host
   hosts: 127.0.0.1
@@ -21,7 +21,7 @@
       command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
     - name: git pull backend Master Branch
       command: "{{ git_dir }} pull chdir={{ be_dir }}"
-   remove this after first done
+  # remove this after first done
     - name: git push master branch
       command: "{{ git_dir }} push {{item}} master chdir={{ be_dir }}"
       with_items: "{{ groups[host] }}"
@@ -57,6 +57,7 @@
       command: "sudo apt install p7zip-full -y"
     - name:  zip FE
       shell: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
     - name:  send zip file to client           
       shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date.stdout }}.7z {{item}}:/tmp  
       with_items: "{{ groups[host] }}"

@@ -1,0 +1,4 @@
+ansible-playbook ./BE-server.yml -i ./inventory --extra-vars '{"remote_user":"devops","be_branch":"master","fe_branch":"master",host":"khajuri-test"}'
+ ansible-playbook ./FE-BuildServer.yml -i ./inventory --extra-vars '{"remote_user":"ubuntu","branch_name":" ","host":"laxmi"}'
+ ansible-playbook ./BE-BuildServer.yml -i ./inventory --extra-vars '{"user_remote":"ubuntu","branch_name":" ","host":"laxmi"}'
+

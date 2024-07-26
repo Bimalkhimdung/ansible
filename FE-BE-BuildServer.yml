@@ -1,0 +1,188 @@
+#>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# ansible-playbook ./FE-BE-production.yml -i ./inventory --extra-vars '{"client_name":"","be_branch":"master","fe_branch":"master",host":"laxmi"}'
+---
+#Authour: Bimal Rai (bimal.rai@aayoulogic.com)
+- name: Building BE 
+  hosts: build
+  connection: local
+  gather_facts: no
+  become: yes
+  become_user: build
+  vars:
+      work_dir: "/home/build/aayulogic"
+      be_dir: "{{ work_dir }}/irealhrsoft-backend"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python3"
+      git_dir: "/usr/bin/git"
+      fe_dir: "{{ work_dir }}/irhrs-frontend"
+      git_dir: "/usr/bin/git"
+      yarn_dir: "/home/build/.nvm/versions/node/v16.18.0/bin/yarn"      
+  tasks:
+      - name: Get current date
+        command: date +"%d%m%Y"
+        register: current_date
+      - name: Deleting old app-compile
+        file:
+          path: "{{item}}"
+          state: absent
+        with_items:
+        - "{{be_dir}}/app-compile"
+      - ansible.builtin.find:
+                paths: "{{be_dir}}" 
+                patterns: "*.7z"
+        register: found_file
+      - name: Deleting old app-compile
+        file:
+          path: "{{item.path}}"
+          state: absent
+        with_items:
+        - "{{ found_file.files }} " 
+
+      - name: Checkout master
+        command: "{{git_dir}} checkout master chdir={{ be_dir}}"
+      - name: Git Pull
+        command: "{{ git_dir }} pull  chdir={{ be_dir }}"
+      - name: Checkout {{ branch_name }}
+        command: "{{git_dir}}  checkout {{ branch_name }} chdir={{ be_dir }}"
+      - name: Git pull {{ branch_name }}
+        command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ be_dir }}"
+      - name: Building app-compile
+        command: "{{ python_dir }} setup.py build_ext -j11 --inplace chdir={{ be_dir}} " #-j11 for cpu core uses.     
+      - file:
+          path: "{{ item.path }}"     
+          state: absent
+        with_items:
+        - "{{ found_files.files }}"
+      - command: "/usr/bin/7z a app_compile_{{ current_date.stdout }}.7z app-compile chdir={{ be_dir }}"
+    - name: Delete old dist
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_item:
+        - "{{ fe_dir }}/dist"
+    - find:
+        paths: "{{ fe_dir }}"
+        patterns: "*.7z"
+      register: found_dist_file
+    - file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items:
+        - "{{ found_dist_file.file }}"        
+    - name: Git chekout master
+      command: "{{ git_dir }} checkout master chdir={{ fe_dir}}"
+    - name: Git Pull.
+      command: "{{ git_dir }} pull origin master chdir={{ fe_dir }}"
+    - name: Git checkout  {{ branch_name }} Branch.
+      command: "{{ git_dir }} checkout {{ branch_name }}  chdir={{ fe_dir }}"
+    - name: Git Pull {{ branch_name }}
+      command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ fe_dir }}"
+    - name: Set clinet_name for Build Dist file
+        ansible.builtin.lineinfile:
+          path: "{{ fe_dir }}/.env"
+          regexp: '^VUE_APP_CLIENT='
+          line: "VUE_APP_CLIENT='{{ client_name }}'"
+          create: yes
+    - name: Yarn Build
+      command: "{{ yarn_dir }} build -j11 chdir={{ fe_dir }} " #-j 11 will use 11 core of cpu
+    - name: Making Zip file
+      command: "/usr/bin/7z a dist-{{ current_date.stdout }}.7z dist chdir={{ fe_dir }} " 
+      - name: Fetching  it to local 
+        ansible.builtin.synchronize:
+          src: "{{ item }}"
+          dest: "/home/bimal/"
+          mode: pull     
+        with_items:
+          -  "app_compile_{{ current_date.stdout }}.7z"
+          -  "dist-{{ current_date.stdout }}.7z"
+- name: Push file 
+  hosts: "{{ host }}"
+  gather_facts: no
+
+  tasks:
+    - command: date +"%d%m%Y"
+      register: current_date
+    - name: Send file 
+      ansible.builtin.synchronize:
+          src: "{{ item }}"
+          dest: "/home/{{ ansible_user }}"
+          mode: push 
+      with_items:
+          - "/home/bimal/app_compile_{{ current_date.stdout }}.7z"
+          - "dist-{{ current_date.stdout }}.7z"
+      delegate_to: localhost   
+
+- name: On Server
+  hosts: "{{ host }}"        
+  gather_facts: no 
+  become: yes 
+  become_user: "{{ ansible_user }}"
+  vars: 
+      work_dir: "/home/{{ ansible_user }}"
+      app_dir: "{{ work_dir }}/app-compile"
+      env_dir: "{{ work_dir }}/realhrsoft"
+      python_dir: "{{ env_dir }}/bin/python3"
+  tasks:
+    - name: Get current date
+      command: date +"%d%m%Y"
+      register: current_date
+    - name: Service  stop
+      block:
+      - service: 
+          name: "laxmi-backend"
+          state: stopped
+      - service:  
+         name: "laxmi-qcluster"
+         state: stopped
+      become: yes
+      become_user: root 
+        
+    - name: check current app-compile file 
+      stat:
+        path: "{{ work_dir }}/app-compile-bak-{{ current_date.stdout }}"
+      register: file_check
+    - name: Backing Up old files
+      shell: chdir={{ work_dir }}  mv app-compile  app-compile-bak-{{ current_date.stdout }}
+      when: not file_check.stat.exists
+    - name: Unzip file
+      command: "7z x app_compile_{{ current_date.stdout }}.7z  chdir={{ work_dir }}"
+    - name: Copying environment file
+      shell: "/usr/bin/cp  app-compile-bak-{{ current_date.stdout }}/.env app-compile chdir={{ work_dir }}"
+    - name: Making Key-files
+      shell: |
+            mkdir key-files
+            {{ python_dir }} manage.py generate_rsa_keys --skip-checks
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Make migration
+      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
+    - name: Setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{ app_dir }}"
+
+    - name: Check current dist file 
+      stat:
+        path: "{{ work_dir }}/dist-bak-{{ current_date.stdout}}"
+      register: check_dist
+    - name: Backup dist
+      command: "mv dist dist-bak-{{ current_date.stdout }} chdir={{ work_dir }}"
+      when: not check_dist.stat.exists
+    - name: Extracting dist
+      ansible.builtin.shell: "/usr/bin/7z x dist-{{ current_date.stdout }}.7z chdir={{ work_dir }}"
+      args:
+        executable: /bin/bash
+    - name: Copy runtimeConfig
+      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  dist/  chdir={{ work_dir }}"
+    - name: Service  Start
+      block:
+      - service: 
+          name: "laxmi-backend"
+          state: restarted
+      - service:  
+         name: "laxmi-qcluster"
+         state: restarted
+      - service: 
+          name: "nginx"
+          state: reloaded
+      become: yes
+      become_user: root       
+         
