@@ -25,46 +25,64 @@ echo "Latest fe_tag: $fe_tag"
 #git checkout $fe_tag
 
 cd ~/production
+#hrms.realhrsoft.com
+echo -e "stating hrms.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"test\",\"client_name\":\"hrms\",\"host\":\"hrms\"}"
+echo -e "Completed hrms.realhrsoft.com update\n"
+#core.realhrsoft.com
+echo -e "stating core.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"core\",\"host\":\"core\"}"
+echo -e "Completed core.realhrsoft.com update\n"
+#merojob.realhrsoft.com
+echo -e "stating merojob.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"merojob\",\"host\":\"merojob\"}"
+echo -e "Completed merojob.realhrsoft.com update\n"
 #ewc.realhrsoft.com
-echo "stating ewc.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"ewc\",\"host\":\"ewc\"}"
-echo "Completed ewc.realhrsoft.com update"
+echo -e "stating ewc.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"ewc\",\"host\":\"ewc\"}"
+echo -e "Completed ewc.realhrsoft.com update\n"
 #shtc.realhrsoft.com
-echo "stating shtc.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"shtc\",\"host\":\"shtc\"}"
-echo "Completed shtc.realhrsoft.com update"
+echo -e "stating shtc.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"shtc\",\"host\":\"shtc\"}"
+echo -e "Completed shtc.realhrsoft.com update\n"
 #r2m.realhrsoft.com
-echo "stating r2m.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"r2m\",\"host\":\"r2m\"}"
-echo "Completed r2m.realhrsoft.com update"
+echo -e "stating r2m.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"r2m\",\"host\":\"r2m\"}"
+echo -e "Completed r2m.realhrsoft.com update\n"
 #mediquest.realhrsoft.com
-echo "stating mediquest.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"mediquest\",\"host\":\"mediquest\"}"
-echo "Completed mediquest.realhrsoft.com update"
+echo -e "stating mediquest.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"mediquest\",\"host\":\"mediquest\"}"
+echo -e "Completed mediquest.realhrsoft.com update\n"
 #musicnepal.realhrsoft.com
-echo "stating musicnepal.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"musicnepal\",\"host\":\"musicnepal\"}"
-echo "Completed musicnepal.realhrsoft.com update"
+echo -e "stating musicnepal.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"musicnepal\",\"host\":\"musicnepal\"}"
+echo -e "Completed musicnepal.realhrsoft.com update\n"
 #spark.realhrsoft.com
-echo "stating spark.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"spark\",\"host\":\"spark\"}"
-echo "Completed spark.realhrsoft.com update"
+echo -e "stating spark.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"spark\",\"host\":\"spark\"}"
+echo -e "Completed spark.realhrsoft.com update\n"
 #awecode.realhrsoft.com
-echo "stating awecode.realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"awecode\",\"host\":\"awecode\"}"
-echo "Completed awecode.realhrsoft.com update"
+echo -e "stating awecode.realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"awecode\",\"host\":\"awecode\"}"
+echo -e "Completed awecode.realhrsoft.com update\n"
 #hei.realhrsoft.com
-echo "stating hei realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"hei\",\"host\":\"hei\"}"
-echo "Completed hei realhrsoft.com update"
-echo "All Tasked completed"
+echo -e "stating hei realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"hei\",\"host\":\"hei\"}"
+echo -e "Completed hei realhrsoft.com update\n"
+echo -e "All Tasked completed"
 #wrp.realhrsoft.com
-echo "stating wrp realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"wrp\",\"host\":\"wrp\"}"
-echo "Completed wrp realhrsoft.com update"
-echo "All Tasked completed"
+echo -e "stating wrp realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"wrp\",\"host\":\"wrp\"}"
+echo -e "Completed wrp realhrsoft.com update\n"
+echo -e "All Tasked completed"
 #snp.realhrsoft.com
-echo "stating snp realhrsoft.com update"
-ansible-playbook ./version_update_arm_aws.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"snp\",\"host\":\"snp\"}"
-echo "Completed snp realhrsoft.com update"
-echo "All Tasked completed"
+echo -e "stating snp realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"snp\",\"host\":\"snp\"}"
+echo -e "Completed snp realhrsoft.com update\n"
+#nyayahealthnepal.realhrsoft.com
+echo -e "stating nyayahealthnepal realhrsoft.com update\n"
+ansible-playbook ./client_version_update.yml -i inventory --extra-vars "{\"be\":\"$be_tag\",\"fe\":\"$fe_tag\",\"user\":\"ubuntu\",\"client_name\":\"nyayahealthnepal\",\"host\":\"nyayahealthnepal\"}"
+echo -e "Completed nyayahealthnepal realhrsoft.com update\n"
+
+
+echo -e "All Tasked completed"

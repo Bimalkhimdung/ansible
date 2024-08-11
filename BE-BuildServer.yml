@@ -49,7 +49,7 @@
           path: "{{ item.path }}"     
           state: absent
         with_items:
-        - "{{ found_files.files }}"
+        - "{{ found_file.files }}"
       - command: "/usr/bin/7z a app_compile_{{ current_date.stdout }}.7z app-compile chdir={{ be_dir }}"
       - name: Fetching  it to local 
         ansible.builtin.synchronize:
@@ -91,7 +91,7 @@
           name: "laxmi-backend"
           state: stopped
       - service:  
-         name: "laxmi_q"
+         name: "laxmi_qcluster"
          state: stopped
       become: yes
       become_user: root 
