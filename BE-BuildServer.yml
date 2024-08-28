@@ -11,9 +11,8 @@
   vars:
       work_dir: "/home/build/aayulogic"
       be_dir: "{{ work_dir }}/irealhrsoft-backend"
-      python_dir: "{{ be_dir }}/realhrsoft/bin/python3"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python"
       git_dir: "/usr/bin/git"
-      ssh_user: "{{ user_remote}}"
   tasks:
       - name: Get current date
         command: date +"%d%m%Y"
@@ -56,10 +55,9 @@
           src: "{{ be_dir }}/app_compile_{{ current_date.stdout }}.7z"
           dest: "/home/bimal/"
           mode: pull
-- name: Push file 
+- name: Push file To server
   hosts: "{{ host }}"
   gather_facts: no
-
   tasks:
     - command: date +"%d%m%Y"
       register: current_date
@@ -71,7 +69,7 @@
       with_items:
           - "/home/bimal/app_compile_{{ current_date.stdout }}.7z"
       delegate_to: localhost      
-- name: On Server
+- name: On Server Side
   hosts: "{{ host }}"        
   gather_facts: no 
   become: yes 
@@ -91,7 +89,7 @@
           name: "laxmi-backend"
           state: stopped
       - service:  
-         name: "laxmi_qcluster"
+         name: "laxmi-qcluster"
          state: stopped
       become: yes
       become_user: root 
