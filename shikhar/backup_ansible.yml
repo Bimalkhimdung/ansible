@@ -1,0 +1,11 @@
+#ansible-playbook -i ~/production/inventory 
+---
+- name: Shikhar insurance backup db
+  hosts: shikharinsurance
+  gather_facts: no
+  vars:
+    working_dir = "~/{{ client_name}}-realhrsoft-backend"
+  steps:
+
+    - name: Taking backup
+      command: "{{ working_dir }}/bin/python db_backup.py chdir={{ working_dir }}/app-compile"

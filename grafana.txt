@@ -1,0 +1,29 @@
+(node_systemd_unit_state{name="demo-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="demo-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="hrms-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="hrms-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="core-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="core-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="merojob-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="merojob-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="musicnepal-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="musicnepal-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="mediquest-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="mediquest-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="snp-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="snp-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="wrp-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="wrp-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="nyayahealthnepal-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="nyayahealthnepal-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="r2m-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="r2m-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="sparkgroup-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="sparkgroup-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="shtc-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="shtc-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="hei-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="hei-realhrsoft-qcluster.service",state="inactive"}) OR
+(node_systemd_unit_state{name="ewc-realhrsoft-backend.service",state="inactive"}
+OR node_systemd_unit_state{name="ewc-realhrsoft-qcluster.service",state="inactive"})
+
