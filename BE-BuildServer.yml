@@ -1,5 +1,5 @@
 #>>>>>>>>>>>>>>>>>>>>>>>>>>>>><<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-# ansible-playbook ./BE-server.yml -i ./inventory --extra-vars '{"branch_name":"master","host":""}'
+# ansible-playbook ./BE-BuildServer.yml -i ./inventory --extra-vars '{"branch_name":"payroll-incentive","host":"laxmi-test"}'
 ---
 #Authour: Bimal Rai (bimal.rai@aayoulogic.com)
 - name: Building BE 
@@ -52,9 +52,12 @@
       - command: "/usr/bin/7z a app_compile_{{ current_date.stdout }}.7z app-compile chdir={{ be_dir }}"
       - name: Fetching  it to local 
         ansible.builtin.synchronize:
-          src: "{{ be_dir }}/app_compile_{{ current_date.stdout }}.7z"
+          src: "{{ be_dir }}/{{ item }}"
           dest: "/home/bimal/"
           mode: pull
+        with_items:
+          - "app_compile_{{ current_date.stdout }}.7z"
+
 - name: Push file To server
   hosts: "{{ host }}"
   gather_facts: no
@@ -62,7 +65,7 @@
     - command: date +"%d%m%Y"
       register: current_date
     - name: Send file 
-      ansible.builtin.synchronize:
+      ansible.posix.synchronize:
           src: "{{ item }}"
           dest: "/home/{{ ansible_user }}"
           mode: push 
