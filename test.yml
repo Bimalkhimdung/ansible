@@ -1,9 +1,7 @@
 ---
 - name: Building BE 
-  hosts: all
-  gather_facts: no
-  become: yes
-  become_user: build
+  hosts: build-server
+  gather_facts: false
   vars:
       work_dir: "/home/build/aayulogic"
       be_dir: "{{ work_dir }}/irealhrsoft-backend"
@@ -15,7 +13,7 @@
         command: date +"%d%m%Y"
         register: current_date
       - name:  make dir
-        command: "mkdir test-awx chdir=/home/build"
+        command: "mkdir test-awx2 chdir=/home/build"
 
         
 
