@@ -1,70 +1,105 @@
-- name: Automation Update On MBL
-  hosts: 127.0.0.1        
-  gather_facts: no 
-  become: yes 
-  become_user: realhrsoftuat
+- name: Building BE 
+  hosts: build
+  connection: local
+  gather_facts: no
+  become: yes
+  become_user: build
   vars:
-    home_dir: "/home/realhrsoftuat"
-    work_dir: "{{ work_dir }}/mbl-realhrsoft-backend"
-    app_dir: "{{ work_dir }}/mbl-realhrsoft-backend/app-compile"
+      work_dir: "/home/build/aayulogic"
+      be_dir: "{{ work_dir }}/irealhrsoft-backend"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python"
+      git_dir: "/usr/bin/git"
+      fe_dir: "{{ work_dir }}/irhrs-frontend"
+      yarn_dir: "/home/build/.nvm/versions/node/v16.18.0/bin/yarn"
+      current_date: "{{ lookup('pipe', 'date +%d%m%Y') }}"
   tasks:
-    - name: current date
-      command: date +"%d%m%Y"
-      register: current_date
-    - name: Service  stop
-      block:
-      - service: 
-          name: "mbl-realhrsoft-backend"
-          state: stopped
-      - service:  
-         name: "mbl-realhrsoft-qcluster"
-         state: stopped
-      become: yes
-      become_user: root 
-        
-    - name: check current app-compile file 
-      stat:
-        path: "{{ work_dir }}/app-compile-bak-{{ current_date.stdout }}"
-      register: be_check
-    - name: Backing Up old files
-      shell: chdir={{ work_dir }}  mv app-compile  app-compile-bak-{{ current_date.stdout }}
-      when: not be_check.stat.exists
-    - command: "mv /tmp/app_compile_{{ current_date.stdout }} {{ work_dir }} chdir={{ work_dir }}"
-    - name: Unzip file
-      command: "7z x app_compile_{{ current_date.stdout }}.7z  chdir={{ work_dir }}"
-    - name: Copying environment file
-      shell: "/usr/bin/cp -r app-compile-bak-{{ current_date.stdout }}/.env app-compile chdir={{ work_dir }}"
-    - command: "cp -r app-compile-bak-{{ current_date.stdout }}/key-files  app-compile chdir={{ work_dir }}"
-    - name: Make migration
-      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
-    - name: Setup HRS Permission
-      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{ app_dir }}"
+      # - name: Clean old app-compile files and .7z archives
+        # ansible.builtin.find:
+          # paths: "{{ be_dir }}"
+          # patterns: ["app-compile", "*.7z"]
+        # register: old_files
+# 
+      # - name: Remove old app-compile 
+        # ansible.builtin.file:
+          # path: "{{ item.path }}"
+          # state: absent
+        # loop: "{{ old_files.files }}"
+        # when: old_files.matched > 0
+      # - name: Git PULL
+        # command: "{{ git_dir }} pull chdir={{ be_dir}}"
 
-    - name: Check current dist file 
-      stat:
-        path: "{{ home_dir }}/dist-bak-{{ current_date.stdout}}"
-      register: fe_check
-    - name: Backup dist
-      command: "mv dist dist-bak-{{ current_date.stdout }} chdir={{ home_dir }}"
-      when: not fe_check.stat.exists
-    - command: "mv /tmp/dist_{{ current_date.stdout }} {{ home_dir }} chdir={{ home_dir }}"
-    - name: Extracting dist
-      ansible.builtin.shell: "/usr/bin/7z x dist_{{ current_date.stdout }}.7z chdir={{ home_dir }}"
-      args:
-        executable: /bin/bash
-    - command: "mv dist mbl-realhrsoft-frontend chdir={{ home_dir }}"
-    - name: Copy runtimeConfig
-      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  mbl-realhrsoft-frontend  chdir={{ home_dir }}"
-    - name: Service  Start
-      block:
-      - service: 
-          name: "mbl-realhrsoft-backend"
-          state: restarted
-      - service:  
-         name: "mbl-realhrsoft-backend"
-         state: restarted
-      - service: 
-          name: "nginx"
-          state: reloaded
-      become: yes
-      become_user: root 
+      - name: Checkout "{{ branch_name }}" branch 
+        ansible.builtin.command:
+          cmd: "git checkout {{ branch_name }}"
+        args:
+          chdir: "{{ be_dir }}"
+  
+      - name: Pull latest changes for "{{ branch_name }}"
+        ansible.builtin.command:
+          cmd: "git pull origin {{ branch_name }}"
+        args:
+          chdir: "{{ be_dir }}"
+  
+      # - name: Build app-compile 
+        # ansible.builtin.command:
+          # cmd: "{{ python_dir }} setup.py build_ext -j11 --inplace"
+        # args:
+          # chdir: "{{ be_dir }}"
+      - command: "rm app_compile_{{ current_date }}.7z chdir={{ be_dir }}"
+        ignore_errors: yes
+
+      - name: Compress the app-compile folder 
+        command: "/usr/bin/7z a app_compile_{{ current_date }}.7z app-compile chdir={{ be_dir }}"
+  
+      - name: Fetch the app_compile archive to local
+        ansible.builtin.synchronize:
+          src: "{{ be_dir }}/app_compile_{{ current_date }}.7z"
+          dest: "/home/bimal/"
+          mode: pull
+      - name: Delete old dist
+        file:
+          path: "{{ item }}"
+          state: absent
+        with_items:
+        - "{{ fe_dir }}/dist"
+      - find:
+          paths: "{{ fe_dir }}"
+          patterns: "*.7z"
+        register: found_dist_file
+      - file:
+          path: "{{ item.path }}"
+          state: absent
+        with_items:
+        - "{{ found_dist_file.files }}"        
+      - name: Git PULL
+        command: "{{ git_dir }} pull chdir={{ fe_dir}}"
+
+      - name: Git checkout  {{ branch_name }} Branch.
+        command: "{{ git_dir }} checkout {{ branch_name }}  chdir={{ fe_dir }}"
+      
+      - name: Git Pull {{ branch_name }}
+        command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ fe_dir }}"
+      
+      - name: Set clinet_name for Build Dist file
+        ansible.builtin.lineinfile:
+            path: "{{ fe_dir }}/.env"
+            regexp: '^VUE_APP_CLIENT='
+            line: "VUE_APP_CLIENT='realhr'"
+            create: yes
+      
+      - name: yarn build
+        shell: |
+          source /home/build/.nvm/nvm.sh
+          yarn build -j10 
+        args:
+          chdir: "{{ fe_dir }}"
+          executable: /bin/bash
+      
+      - name: Making Zip file
+        command: "/usr/bin/7z a dist_{{ current_date }}.7z dist chdir={{ fe_dir }} "
+      
+      - name: Fetching  dist to local 
+        ansible.builtin.synchronize:
+            src: "{{ fe_dir }}/dist_{{ current_date }}.7z"
+            dest: "/home/bimal/"
+            mode: pull          

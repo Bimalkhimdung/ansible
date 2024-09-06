@@ -1,4 +1,3 @@
-# ansible-playbook -i inventory ./BE_build.yml --extra-vars '{"branch_name":"payroll-incentive"}'
 ---
 - name: Build and Deploy Backend
   hosts: build
@@ -27,9 +26,7 @@
         state: absent
       loop: "{{ old_files.files }}"
       when: old_files.matched > 0
-    - name: Git PULL
-      command: "{{ git_dir }} pull chdir={{ be_dir}}"
-        
+
     - name: Checkout target branch "{{ branch_name }}"
       ansible.builtin.command:
         cmd: "git checkout {{ branch_name }}"
