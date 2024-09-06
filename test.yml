@@ -1,34 +1,24 @@
 #Authour: Bimal Rai (bimal.rai@aayoulogic.com)
 - name: Building BE 
-  hosts: build
-  connection: local
+  hosts: all
   gather_facts: no
   become: yes
   become_user: build
+  vars:
+      work_dir: "/home/build/aayulogic"
+      be_dir: "{{ work_dir }}/irealhrsoft-backend"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python"
+      git_dir: "/usr/bin/git"
 
-  ansible.builtin.set_fact:
-                work_dir: "/home/build/aayulogic"
-                fe_dir: "{{ work_dir }}/irhrs-frontend"
   tasks:
       - name: Get current date
         command: date +"%d%m%Y"
         register: current_date
-      - name: Ensure .env file contains the correct VUE_APP_CLIENT
-        command: "mkdir test1 chdir={{ fe_dir }}"
+      - name:  make dir
+        command: "mkdir test-awx"
+
         
-- name: Building BE 
-  hosts: build
-  connection: local
-  gather_facts: no
-  become: yes
-  become_user: build       
 
-  tasks:
-      - name: Get current date
-        command: date +"%d%m%Y"
-        register: current_date
-      - name: Ensure .env file contains the correct VUE_APP_CLIENT
-        command: "mkdir test2 chdir={{ fe_dir }}"
        
        
        
