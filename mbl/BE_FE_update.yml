@@ -1,0 +1,70 @@
+- name: Automation Update On MBL
+  hosts: 127.0.0.1        
+  gather_facts: no 
+  become: yes 
+  become_user: realhrsoftuat
+  vars:
+    home_dir: "/home/realhrsoftuat"
+    work_dir: "{{ work_dir }}/mbl-realhrsoft-backend"
+    app_dir: "{{ work_dir }}/mbl-realhrsoft-backend/app-compile"
+  tasks:
+    - name: current date
+      command: date +"%d%m%Y"
+      register: current_date
+    - name: Service  stop
+      block:
+      - service: 
+          name: "mbl-realhrsoft-backend"
+          state: stopped
+      - service:  
+         name: "mbl-realhrsoft-qcluster"
+         state: stopped
+      become: yes
+      become_user: root 
+        
+    - name: check current app-compile file 
+      stat:
+        path: "{{ work_dir }}/app-compile-bak-{{ current_date.stdout }}"
+      register: be_check
+    - name: Backing Up old files
+      shell: chdir={{ work_dir }}  mv app-compile  app-compile-bak-{{ current_date.stdout }}
+      when: not be_check.stat.exists
+    - command: "mv /tmp/app_compile_{{ current_date.stdout }} {{ work_dir }} chdir={{ work_dir }}"
+    - name: Unzip file
+      command: "7z x app_compile_{{ current_date.stdout }}.7z  chdir={{ work_dir }}"
+    - name: Copying environment file
+      shell: "/usr/bin/cp -r app-compile-bak-{{ current_date.stdout }}/.env app-compile chdir={{ work_dir }}"
+    - command: "cp -r app-compile-bak-{{ current_date.stdout }}/key-files  app-compile chdir={{ work_dir }}"
+    - name: Make migration
+      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
+    - name: Setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{ app_dir }}"
+
+    - name: Check current dist file 
+      stat:
+        path: "{{ home_dir }}/dist-bak-{{ current_date.stdout}}"
+      register: fe_check
+    - name: Backup dist
+      command: "mv dist dist-bak-{{ current_date.stdout }} chdir={{ home_dir }}"
+      when: not fe_check.stat.exists
+    - command: "mv /tmp/dist_{{ current_date.stdout }} {{ home_dir }} chdir={{ home_dir }}"
+    - name: Extracting dist
+      ansible.builtin.shell: "/usr/bin/7z x dist_{{ current_date.stdout }}.7z chdir={{ home_dir }}"
+      args:
+        executable: /bin/bash
+    - command: "mv dist mbl-realhrsoft-frontend chdir={{ home_dir }}"
+    - name: Copy runtimeConfig
+      command: "cp dist-bak-{{ current_date.stdout }}/runtimeConfig.json  mbl-realhrsoft-frontend  chdir={{ home_dir }}"
+    - name: Service  Start
+      block:
+      - service: 
+          name: "mbl-realhrsoft-backend"
+          state: restarted
+      - service:  
+         name: "mbl-realhrsoft-backend"
+         state: restarted
+      - service: 
+          name: "nginx"
+          state: reloaded
+      become: yes
+      become_user: root 

@@ -1,0 +1,55 @@
+- name: Building BE 
+  hosts: build
+  connection: local
+  gather_facts: no
+  become: yes
+  become_user: build
+  vars:
+      work_dir: "/home/build/aayulogic"
+      be_dir: "{{ work_dir }}/irealhrsoft-backend"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python"
+      git_dir: "/usr/bin/git"
+  tasks:
+      - name: Get current date
+        command: date +"%d%m%Y"
+        register: current_date
+      - name: Deleting old app-compile
+        file:
+          path: "{{item}}"
+          state: absent
+        with_items:
+        - "{{be_dir}}/app-compile"
+      - ansible.builtin.find:
+                paths: "{{be_dir}}" 
+                patterns: "*.7z"
+        register: found_file
+      - name: Deleting old app-compile
+        file:
+          path: "{{item.path}}"
+          state: absent
+        with_items:
+        - "{{ found_file.files }} " 
+
+      - name: Checkout master
+        command: "{{git_dir}} checkout master chdir={{ be_dir}}"
+      - name: Git Pull
+        command: "{{ git_dir }} pull  chdir={{ be_dir }}"
+      - name: Checkout {{ branch_name }}
+        command: "{{git_dir}}  checkout {{ branch_name }} chdir={{ be_dir }}"
+      - name: Git pull {{ branch_name }}
+        command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ be_dir }}"
+      - name: Building app-compile
+        command: "{{ python_dir }} setup.py build_ext -j11 --inplace chdir={{ be_dir}} " #-j11 for cpu core uses.
+      - file:
+          path: "{{ item.path }}"     
+          state: absent
+        with_items:
+        - "{{ found_file.files }}"
+      - command: "/usr/bin/7z a app_compile_{{ current_date.stdout }}.7z app-compile chdir={{ be_dir }}"
+      - name: Fetching  it to local 
+        ansible.builtin.synchronize:
+          src: "{{ be_dir }}/{{ item }}"
+          dest: "/home/bimal/"
+          mode: pull
+        with_items:
+          - "app_compile_{{ current_date.stdout }}.7z"
