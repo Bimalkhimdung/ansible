@@ -1,4 +1,4 @@
-#Authour: Bimal Rai (bimal.rai@aayoulogic.com)
+---
 - name: Building BE 
   hosts: all
   gather_facts: no
@@ -15,20 +15,11 @@
         command: date +"%d%m%Y"
         register: current_date
       - name:  make dir
-        command: "mkdir test-awx"
+        command: "mkdir test-awx chdir=/home/build"
 
         
 
        
        
        
-       
-       
-       
-       
-        # ansible.builtin.fetch:
-        #   src: "{{ be_dir }}/app_compile_03072024.7z"
-        #   dest: /home/bimal/
-        #   flat: yes 
-        # become: yes
-        # become_user: build
+  
