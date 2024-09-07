@@ -1,0 +1,55 @@
+- name: Automation Deployment on MBL 
+  hosts: 127.0.0.1        
+  gather_facts: no 
+  become: yes 
+  become_user: hrms
+  vars: 
+      work_dir: "/home/hrms"
+      app_dir: "{{ work_dir }}/mbl-realhrsoft-backend/app-compile"
+      env_dir: "{{ work_dir }}/mbl-realhrsoft-backend"
+      python_dir: "{{ env_dir }}/bin/python3"
+      current_date: "{{ lookup('pipe','date +%d%m%Y') }}"
+  tasks:
+    - name: Service  stop
+      block:
+      - service: 
+          name: "mbl-realhrsoft-backend"
+          state: stopped
+      - service:  
+         name: "mbl-realhrsoft-qcluster"
+         state: stopped
+      become: yes
+      become_user: root 
+        
+    - name: check current app-compile file 
+      stat:
+        path: "{{ env_dir }}/app-compile-bak-{{ current_date }}"
+      register: file_check
+    - name: Backing Up old files
+      shell: chdir={{ env_dir }}  mv app-compile  app-compile-bak-{{ current_date }}
+      when: not file_check.stat.exists
+    - name: Move file
+      command: "mv /tmp/app_compile_{{ current_date }}  {{ env_dir }} chdir={{ env_dir }}"
+    - name: Unzip file
+      command: "7z x app_compile_{{ current_date }}.7z  chdir={{ env_dir }}"
+    - name: Copying environment file
+      shell: "/usr/bin/cp -r app-compile-bak-{{ current_date }}/.env app-compile chdir={{ env_dir }}"
+    - name: Making Key-files
+      command: "cp -r app-compile-bak-{{ current_date }}/key-files app-compile chdir={{ env_dir }}"
+    - name: Make migration
+      command: "{{ python_dir }} manage.py migrate chdir={{ app_dir }}"
+    - name: Setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{ app_dir }}"
+    - name: Service  Start
+      block:
+      - service: 
+          name: "mbl-realhrsoft-backend"
+          state: restarted
+      - service:  
+         name: "mbl-realhrsoft-qcluster"
+         state: restarted
+      - service: 
+          name: "nginx"
+          state: reloaded
+      become: yes
+      become_user: root 

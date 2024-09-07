@@ -1,0 +1,58 @@
+#ansible-playbook ./FE_build.yml -i inventory --extra-vars '{"branch_name":"payroll-incentive"}'
+---
+- name: building frontend
+  hosts: bimal
+  gather_facts: no
+  become: yes
+  become_user: bimal
+  vars:
+    work_dir: "/home/bimal/aayulogic/"
+    fe_dir: "~/aayulogic/irhrs-frontend"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+    current_date: "{{ lookup('pipe', 'date +%d%m%Y') }}"
+  tasks:
+    - name: Delete old dist
+      file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+      - "{{ fe_dir }}/dist"
+    - find:
+        paths: "{{ fe_dir }}"
+        patterns: "*.7z"
+      register: found_dist_file
+    - file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items:
+      - "{{ found_dist_file.files }}"        
+    - name: Git PULL
+      command: "{{ git_dir }} pull chdir={{ fe_dir}}"
+    
+    - name: Git checkout  {{ branch_name }} Branch.
+      command: "{{ git_dir }} checkout {{ branch_name }}  chdir={{ fe_dir }}"
+    
+    - name: Git Pull {{ branch_name }}
+      command: "{{ git_dir }} pull origin {{ branch_name }} chdir={{ fe_dir }}"
+    
+    - name: Set clinet_name for Build Dist file
+      ansible.builtin.lineinfile:
+          path: "{{ fe_dir }}/.env"
+          regexp: '^VUE_APP_CLIENT='
+          line: "VUE_APP_CLIENT='realhr'"
+          create: yes
+    
+    - name: yarn build
+      shell: |
+        source /home/build/.nvm/nvm.sh
+        yarn build -j10 
+      args:
+        chdir: "{{ fe_dir }}"
+        executable: /bin/bash
+    
+    - name: Making Zip file
+      command: "/usr/bin/7z a dist_{{ current_date }}.7z dist chdir={{ fe_dir }} "
+    
+
+

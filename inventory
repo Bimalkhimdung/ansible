@@ -1,5 +1,5 @@
 [build]
-192.168.1.53  ansible_connection=ssh  ansible_user=build
+192.168.1.53  ansible_connection=ssh  ansible_user=build ansible_port=22
 
 [laxmi-test]
 192.168.1.31  ansible_connection=ssh ansible_user=ubuntu
