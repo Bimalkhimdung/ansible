@@ -1,0 +1,139 @@
+#ansible-playbook ./new_version_update_datalaya.yml -i ./inventory --extra-vars '{"be_tag":"3.0.45.0+240405","fe_tag":"3.0.45.0+240405","client_name":"testcore","host":"testcore"}'
+---
+- name: a play that runs entirely on the ansible host
+  hosts: 127.0.0.1
+  connection: local
+  become: true
+  gather_facts: no
+
+  vars:
+    be_tag: "{{ be }}"
+    fe_tag: "{{ fe }}"
+    fe_dir: "~/aayulogic/irhrs-frontend/"
+    be_dir: "~/aayulogic/irealhrsoft-backend/"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/bimal/.nvm/versions/node/v16.18.0/bin/yarn"
+    current_date: "{{ lookup('pipe', 'date +%d%m%Y')}}"
+  tasks:
+    - name: Git Pull
+      command: "{{ git_dir }} pull chdir={{ be_dir }}"
+
+    - name: Checkout to {{ be_tag }} tag for Backend
+      command: "{{ git_dir }} checkout {{be_tag}} chdir={{ be_dir }}"
+
+    - name: git pull backend {{ be_tag }} tag
+      command: "{{ git_dir }} pull origin {{ be_tag }} chdir={{ be_dir }}"
+
+    - name: git push
+      command: "{{ git_dir }} push {{item}} {{be_tag}} chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+
+    - name: Git pull for frontend 
+      command: "{{ git_dir }} pull chdir={{ fe_dir }}"
+
+    - name: checkout frontend {{fe_tag}} TAG
+      command: "{{ git_dir }} checkout {{fe_tag}} chdir={{ fe_dir }}"
+
+    - name: git pull {{ fe_tag }}
+      command: "{{ git_dir }} pull origin {{ fe_tag }} chdir={{ fe_dir }}"
+
+    - name: Delete old dist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_item:
+        - "{{ fe_dir }}/dist"
+
+    - ansible.builtin.find:
+        paths: "{{ fe_dir }}"
+        patterns: "*.7z"
+      register: found_dist_file
+    - ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      with_items:
+        - "{{ found_dist_file.file }}"
+
+    - name: Build Dist file
+      command: "{{yarn_dir}} build -j3 chdir={{ fe_dir }}"
+
+    - name:  Zip Dist
+      shell: "/usr/bin/7z a dist-{{ current_date }}.7z dist chdir={{ fe_dir }}"
+      args:
+        executable: /bin/bash
+
+    - name:  send zip file to {{client_name}}           
+      shell: chdir=~/aayulogic/irhrs-frontend/ /usr/bin/scp dist-{{ current_date }}.7z {{item}}:/tmp  
+      with_items: "{{ groups[host] }}"
+
+- name: Version Update Automation on  Server Side
+  hosts: "{{ host }}"
+  gather_facts: no
+
+  vars:
+    work_dir: "/home/{{ ansible_user }}"
+    env_dir: "{{work_dir}}/{{ client_name }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client_name }}-realhrsoft-frontend"
+    pip_dir: "{{ env_dir }}/bin/pip"
+    python_dir: "{{ env_dir }}/bin/python"
+    git_dir: "/usr/bin/git"
+    current_date: "{{ lookup('pipe', 'date +%d%m%Y') }}"
+  tasks:
+    - name: Stop Services
+      block:
+      - service:
+          name: "{{ client_name }}-realhrsoft-backend"
+          state: stopped
+      - service:
+          name: "{{ client_name }}-realhrsoft-backend"
+          state: stopped
+      become: yes
+      become_user: root
+  
+    - name: Backup DATABASE
+      command: "{{python_dir}} db_backup.py chdir={{ be_dir }}"
+    
+    - name: Change backend to {{be_tag}} tag
+      command: "{{git_dir}} checkout {{be_tag}} chdir=/home/{{ ansible_user }}/{{ client_name }}-repo.git"
+    
+    - name: Install Requirements
+      command: "{{ pip_dir }} install -r requirements/production.txt chdir={{  be_dir  }}"
+
+    - name: Python Migration
+      command: "{{ python_dir }} manage.py migrate chdir={{  be_dir  }}"
+
+    - name: Setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{  be_dir  }}"
+
+    - name: Backup Frontend
+      command: "sudo mv {{ client_name }}-realhrsoft-frontend {{ client_name }}-realhrsoft-frontend-bak-{{current_date}} chdir={{ work_dir }}"
+    
+    - command: "sudo mv /tmp/dist-{{ current_date }}.7z {{ work_dir }} chdir={{ work_dir }}"
+    
+    - name: Unzip Dist
+      shell: "/usr/bin/7z x dist-{{ current_date }}.7z chdir={{ work_dir }}"
+    
+    - name: Rename dist 
+      command: "mv dist {{ client_name }}-realhrsoft-frontend chdir={{ work_dir }}"
+    
+    - name: Copy runtimeconfig file
+      command: "sudo cp {{ client_name }}-realhrsoft-frontend-bak-{{current_date}}/runtimeConfig.json {{ fe_dir }} chdir={{ work_dir }}"
+    
+    - name: remove dist file 
+      command: "rm -rf dist-{{ current_date }}.7z chdir={{ work_dir }}"
+    - name: Start Services
+      block:
+      - service:
+          name: "{{ client_name }}-realhrsoft-backend"
+          state: restarted
+      - service:
+          name: "{{ client_name }}-realhrsoft-backend"
+          state: restarted
+      - service:
+            name: nginx
+            state: reloaded
+      become: yes
+      become_user: root
+
+
