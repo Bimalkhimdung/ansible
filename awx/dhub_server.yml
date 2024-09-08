@@ -1,0 +1,19 @@
+---
+- name: Ansible automation for version update
+  hosts: dhub
+  gather_facts: false
+  vars:
+      work_dir: "/home/build/aayulogic"
+      be_dir: "{{ work_dir }}/irealhrsoft-backend"
+      python_dir: "{{ be_dir }}/realhrsoft/bin/python"
+      git_dir: "/usr/bin/git"
+      c_name: "{{ client_name }}"
+      h_f: "{{host}}"
+
+  tasks:
+    - name: Building Dist file
+      ansible.builtin.shell: /home/qaqc/production/demo_version_update.sh {{ c_name }} {{ h_f }}
+      #ansible.builtin.shell: /home/qaqc/production/test.sh
+      args:
+        chdir: /home/qaqc/production
+        executable: /bin/bash

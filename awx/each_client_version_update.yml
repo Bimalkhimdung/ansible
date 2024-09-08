@@ -1,0 +1,147 @@
+---
+- name: Automation for demo version update
+  hosts: localhost
+  gather_facts: no
+  vars:
+    fe_dir: "/home/qaqc/aayulogic/irhrs-frontend"
+    be_dir: "/home/qaqc/aayulogic/irealhrsoft-backend"
+    git_dir: "/usr/bin/git"
+    yarn_dir: "/home/qaqc/.nvm/versions/node/v16.18.0/bin/yarn"
+    current_date: "{{ lookup ('pipe', 'date +%d%m%Y')}}"
+  tasks:
+    - name: checkout backend Master Branch
+      command: "{{ git_dir }} checkout master chdir={{ be_dir }}"
+
+    - name: git pull backend Master Branch
+      command: "{{ git_dir }} pull origin master  chdir={{ be_dir }}"
+
+    - name: checkout backend {{ be_tag }} tag
+      command: "{{ git_dir }} checkout {{ be_tag }} chdir={{ be_dir }}"
+
+    - name: git pull backend {{ be_tag }} tag
+      command: "{{ git_dir }} pull origin {{ be_tag }}  chdir={{ be_dir }}"
+
+    - name: Push {{ be_tag }} to remote server
+      command: "{{ git_dir }} push {{item}} {{be_tag}}  chdir={{ be_dir }}"
+      with_items: "{{ groups[host] }}"
+
+    - name: git checkout Master
+      command: "{{ git_dir }} checkout master   chdir={{ fe_dir }}"
+
+    - command: "{{ git_dir }} pull origin  master   chdir={{ fe_dir }}"
+
+    - name: checkout frontend {{fe_tag}} TAG
+      command: "{{ git_dir }} checkout {{fe_tag}} chdir={{ fe_dir }}"
+
+    - name: git pull {{ fe_tag }}
+      command: "{{ git_dir }} pull origin {{ fe_tag }}  chdir={{ fe_dir }}"
+
+    - name: Set clinet_name for Build Dist file
+      ansible.builtin.lineinfile:
+          path: "{{ fe_dir }}/.env"
+          regexp: '^VUE_APP_CLIENT='
+          line: "VUE_APP_CLIENT='realhr'"
+          create: yes
+
+    - name: Check file
+      stat:
+        path: "{{ fe_dir }}/dist-{{ current_date }}.7z"
+      register: file_check
+
+    - name: Delete old dist
+      shell: "rm -rf dist* chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
+
+    - name: yarn FE
+      shell: |
+        source /home/qaqc/.nvm/nvm.sh
+        yarn
+      args:
+        chdir: "{{ fe_dir }}"
+        executable: /bin/bash
+    - name: yarn build
+      shell: |
+        source /home/qaqc/.nvm/nvm.sh
+        yarn build -j10
+      args:
+        chdir: "{{ fe_dir }}"
+        executable: /bin/bash
+      when: not file_check.stat.exists #skip this step if file exits
+
+    - name:  Zip FE
+      shell: "/usr/bin/7z a dist-{{ current_date }}.7z dist chdir={{ fe_dir }}"
+      when: not file_check.stat.exists
+
+    - name:  send zip file
+      shell: "scp {{ fe_dir}}/dist-{{ current_date }}.7z {{item}}:/tmp"
+      with_items: "{{ groups[host] }}"
+    - ansible.builtin.debug:
+        msg: "Building Dist file for version update at: {{ fe_tag }} on {{ current_date }} sucessfull"
+
+- name: On Server side
+  hosts: "{{ host }}"
+  gather_facts: no
+  become: true
+  become_user: "{{ ansible_user }}"
+  vars:
+    work_dir: "/home/{{ ansible_user }}"
+    env_dir: "{{work_dir}}/{{ client_name }}-realhrsoft-backend"
+    be_dir: "{{ env_dir }}/irealhrsoft-backend"
+    fe_dir: "{{work_dir}}/{{ client_name }}-realhrsoft-frontend"
+    pip_dir: "{{ env_dir }}/bin/pip"
+    python_dir: "{{ env_dir }}/bin/python"
+    git_dir: "/usr/bin/git"
+    current_date: "{{ lookup('pipe','date +%d%m%Y') }}"
+    
+
+
+  tasks:
+    - name: Service  stop
+      block:
+      - service: 
+          name: "{{ client_name}}-realhrsoft-backend"
+          state: stopped
+      - service:  
+         name: "{{ client_name}}-realhrsoft-qcluster"
+         state: stopped
+      become: yes
+      become_user: root
+
+    - name: Backup DATABASE
+      command: "{{python_dir}} db_backup.py chdir={{ be_dir }}"
+      ignore_errors: yes
+    
+    - name: change backend tag {{be_tag}}
+      command: "{{git_dir}} checkout {{be_tag}} chdir=/home/{{ ansible_user }}/{{ client_name }}-repo.git"
+    - name: Install Requirements
+      command: "{{ pip_dir }} install -r requirements/production.txt chdir={{  be_dir  }}"
+    - name: Python Migration
+      command: "{{ python_dir }} manage.py migrate chdir={{  be_dir  }}"
+    - name: setup HRS Permission
+      command: "{{ python_dir }} manage.py setup_hrs_permissions chdir={{  be_dir  }}"
+    - name: Backup Frontend
+      command: "sudo mv {{ client_name }}-realhrsoft-frontend {{ client_name }}-realhrsoft-frontend-bak-{{current_date}} chdir={{ work_dir }}"
+    - name: Move frontend
+      command: "/usr/bin/mv /tmp/dist-{{ current_date }}.7z {{ work_dir }} chdir={{ work_dir }}"
+    - name: unzip frontend
+      shell: "/usr/bin/7z x dist-{{ current_date }}.7z chdir={{ work_dir }}"
+    - name: Rename dist
+      command: "mv dist {{ client_name }}-realhrsoft-frontend chdir={{ work_dir }}"
+    - name: Copy runtimeconfig file
+      command: "/usr/bin/cp {{ client_name }}-realhrsoft-frontend-bak-{{current_date}}/runtimeConfig.json {{ fe_dir }} chdir={{ work_dir }}"
+    - name: remove dist file
+      command: "sudo rm -rf dist-{{ current_date }}.7z chdir={{ work_dir }}"
+
+    - name: Service  Start
+      block:
+      - service: 
+          name: "{{ client_name}}-realhrsoft-backend"
+          state: restarted
+      - service:  
+         name: "{{ client_name }}-realhrsoft-qcluster"
+         state: restarted
+      - service: 
+          name: "nginx"
+          state: reloaded
+      become: yes
+      become_user: root
